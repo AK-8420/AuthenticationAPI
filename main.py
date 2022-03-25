@@ -1,16 +1,37 @@
 from fastapi import FastAPI, Depends
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import OAuth2PasswordRequestForm
 from src import models
+from datetime import timedelta
 
 app = FastAPI()
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 @app.get("/")
 async def root():
     return {"message":"Hello, World!"}
 
 
-@app.get("/users/")
-async def get_users(token: str = Depends(oauth2_scheme)):
-    return {"token": token}
+@app.get("/users/me/", response_model=models.User)
+async def read_users_me(current_user: models.User = Depends(models.get_current_active_user)):
+    return current_user
+
+
+@app.get("/users/me/items/")
+async def read_own_items(current_user: models.User = Depends(models.get_current_active_user)):
+    return [{"item_id": "Foo", "owner": current_user.username}]
+
+
+@app.post("/token", response_model=models.Token)
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
+    user = models.authenticate_user(models.fake_users_db, form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect user_ID or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token_expires = timedelta(minutes=models.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = models.create_access_token(
+        data={"sub": user.user_id}, expires_delta=access_token_expires
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
