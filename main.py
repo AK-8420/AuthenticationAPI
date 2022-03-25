@@ -1,14 +1,24 @@
 from fastapi import FastAPI, Depends
+from fastapi.templating import Jinja2Templates
+from fastapi.requests import Request
 from fastapi.security import OAuth2PasswordRequestForm
 from src import models
 from datetime import timedelta
+from fastapi.staticfiles import StaticFiles
 
 app = FastAPI()
+app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory="templates")
 
 
 @app.get("/")
-async def root():
-    return {"message":"Hello, World!"}
+async def root(request: Request):
+    return templates.TemplateResponse(
+        "index.html",
+        {
+            "request": request,
+        }
+    )
 
 
 @app.get("/users/me/", response_model=models.User)
